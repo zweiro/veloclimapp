@@ -1,13 +1,12 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui'; // Required for DartPluginRegistrant.ensureInitialized()
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart'; // For Bluetooth operations
 import 'package:geolocator/geolocator.dart'; // For GPS location
-import 'package:csv/csv.dart'; // For CSV file generation
 import 'package:sensor_logging/bluetooth_connector_page.dart';
+import 'package:sensor_logging/csv_utils.dart'; // For CSV file operations
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:sensor_logging/utils.dart';
 
@@ -114,6 +113,7 @@ void onStart(ServiceInstance service) async {
 
   bool isReconnecting = false;
   int reconnectionAttempts = 0;
+  bool isCollecting = false; // Prevent concurrent CSV writes
 
   // GPS stream variables for continuous position updates
   Position? lastKnownPosition;
@@ -227,7 +227,7 @@ void onStart(ServiceInstance service) async {
     csvFilePath = data['csvFilePath'];
 
     // Ensure CSV header for this session's file
-    await _ensureCsvHeader(csvFilePath);
+    await ensureCsvHeader(csvFilePath);
 
     // Initialize GPS stream for continuous position updates
     await gpsSubscription?.cancel();
@@ -483,18 +483,24 @@ void onStart(ServiceInstance service) async {
       logTimer = Timer.periodic(const Duration(seconds: 1), (
         timer,
       ) async {
-        if (isReconnecting) {
-          // Skip data collection during reconnection
+        // Skip if reconnecting or already collecting (prevents concurrent writes)
+        if (isReconnecting || isCollecting) {
+          debugPrint('Background service: Skipping tick (reconnecting=$isReconnecting, collecting=$isCollecting)');
           return;
         }
         if (connectedDevice != null && targetCharacteristic != null) {
-          await _collectAndLogData(
-            service,
-            connectedDevice!,
-            targetCharacteristic!,
-            csvFilePath,
-            lastKnownPosition,
-          );
+          isCollecting = true;
+          try {
+            await _collectAndLogData(
+              service,
+              connectedDevice!,
+              targetCharacteristic!,
+              csvFilePath,
+              lastKnownPosition,
+            );
+          } finally {
+            isCollecting = false;
+          }
         } else {
           service.invoke('updateUI', {
             'status':
@@ -621,7 +627,7 @@ Future<void> _collectAndLogData(
 
   // --- Append data to CSV ---
   debugPrint('Background service: Appending data to CSV...');
-  await _appendToCsv([
+  await appendToCsv([
     timestamp,
     temp?.toStringAsFixed(2) ?? 'N/A', // Use 'N/A' if data is null
     hum?.toStringAsFixed(2) ?? 'N/A',
@@ -652,38 +658,6 @@ Future<void> _collectAndLogData(
         ),
   });
   debugPrint('Background service: UI updated with latest data.');
-}
-
-// --- CSV File Management ---
-
-/// Ensures that the CSV file exists and contains the header row.
-/// If the file doesn't exist or is empty, it writes the header.
-Future<void> _ensureCsvHeader(String? csvFilePath) async {
-  if (csvFilePath == null) return;
-  final file = File(csvFilePath);
-  if (!await file.exists() || (await file.readAsString()).trim().isEmpty) {
-    final header = [
-      'Timestamp',
-      'Temperature',
-      'Humidity',
-      'Latitude',
-      'Longitude',
-      'Accuracy',
-    ];
-    final csvString = const ListToCsvConverter().convert([header]);
-    await file.writeAsString('$csvString\n', mode: FileMode.write);
-    debugPrint('CSV header ensured.');
-  } else {
-    debugPrint('CSV header already present.');
-  }
-}
-
-/// Appends a new row of data to the CSV log file.
-Future<void> _appendToCsv(List<dynamic> row, String? csvFilePath) async {
-  if (csvFilePath == null) return;
-  final file = File(csvFilePath);
-  final csvString = const ListToCsvConverter().convert([row]);
-  await file.writeAsString('$csvString\n', mode: FileMode.append);
 }
 
 // --- Main Application Entry Point ---
