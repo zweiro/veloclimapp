@@ -115,6 +115,10 @@ void onStart(ServiceInstance service) async {
   bool isReconnecting = false;
   int reconnectionAttempts = 0;
 
+  // GPS stream variables for continuous position updates
+  Position? lastKnownPosition;
+  StreamSubscription<Position>? gpsSubscription;
+
   // --- Foreground/Background Mode Management for Android ---
   if (service is AndroidServiceInstance) {
     service.on('setAsForeground').listen((event) {
@@ -142,6 +146,8 @@ void onStart(ServiceInstance service) async {
         ?.cancel(); // Cancel device connection state listener
     await adapterStateSubscription
         ?.cancel(); // Cancel Bluetooth adapter state listener
+    await gpsSubscription?.cancel(); // Cancel GPS position stream
+    gpsSubscription = null;
 
     // Attempt to disconnect from the Bluetooth device if it's connected.
     try {
@@ -222,6 +228,21 @@ void onStart(ServiceInstance service) async {
 
     // Ensure CSV header for this session's file
     await _ensureCsvHeader(csvFilePath);
+
+    // Initialize GPS stream for continuous position updates
+    await gpsSubscription?.cancel();
+    gpsSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high, // "best" is not available on Android: https://pub.dev/packages/geolocator#location-accuracy
+        distanceFilter: 0, // Capture all updates regardless of distance
+      ),
+    ).listen((Position position) {
+      lastKnownPosition = position;
+      debugPrint('Background service: GPS position updated: ${position.latitude}, ${position.longitude}');
+    }, onError: (error) {
+      debugPrint('Background service: GPS stream error: $error');
+    });
+    debugPrint('Background service: GPS stream initialized.');
 
     // Prevent starting logging if it's already active.
     if (logTimer?.isActive ?? false) {
@@ -459,7 +480,7 @@ void onStart(ServiceInstance service) async {
       // --- Start Periodic Data Collection & Logging ---
       // This timer will trigger the data collection function at a fixed interval.
       debugPrint('Background service: Starting periodic log timer.');
-      logTimer = Timer.periodic(const Duration(milliseconds: 500), (
+      logTimer = Timer.periodic(const Duration(seconds: 1), (
         timer,
       ) async {
         if (isReconnecting) {
@@ -472,6 +493,7 @@ void onStart(ServiceInstance service) async {
             connectedDevice!,
             targetCharacteristic!,
             csvFilePath,
+            lastKnownPosition,
           );
         } else {
           service.invoke('updateUI', {
@@ -486,7 +508,7 @@ void onStart(ServiceInstance service) async {
       });
 
       service.invoke('updateUI', {
-        'status': 'Connecté. Journalisation toutes les 500ms.',
+        'status': 'Connecté. Journalisation toutes les secondes.',
       });
       debugPrint('Background service: Logging successfully initiated.');
     } catch (e) {
@@ -512,6 +534,7 @@ Future<void> _collectAndLogData(
   BluetoothDevice device,
   BluetoothCharacteristic characteristic,
   String? csvFilePath,
+  Position? cachedPosition,
 ) async {
   debugPrint('Background service: _collectAndLogData called.');
   final now = DateTime.now();
@@ -534,6 +557,7 @@ Future<void> _collectAndLogData(
       );
       List<int> value = await characteristic
           .read(); // Read the characteristic's value
+      debugPrint('Background service: Raw BT bytes received: $value (length: ${value.length})');
       if (value.length >= 8) {
         // Expecting at least 8 bytes for two Float32 values
         final byteData = ByteData.view(Uint8List.fromList(value).buffer);
@@ -546,8 +570,22 @@ Future<void> _collectAndLogData(
           4,
           Endian.little,
         ); // Next 4 bytes for humidity
-        btDataStr =
-            'Temp: ${temp.toStringAsFixed(2)} °C, Hum: ${hum.toStringAsFixed(2)} %';
+        debugPrint('Background service: Parsed temp=$temp, hum=$hum');
+
+        // Check for invalid values (0xFFFFFFFF = sensor error/not ready)
+        final tempBytes = value.sublist(0, 4);
+        final isTempInvalid = tempBytes.every((b) => b == 255); // 0xFFFFFFFF
+
+        if (isTempInvalid) {
+          debugPrint('Background service: Temperature sensor returning 0xFFFFFFFF (not ready or error)');
+          btDataStr = 'Temp: -- °C (capteur non prêt), Hum: ${hum.isNaN ? "--" : hum.toStringAsFixed(2)} %';
+        } else if (temp.isNaN || hum.isNaN) {
+          debugPrint('Background service: WARNING - NaN detected! Raw bytes: $tempBytes (temp), ${value.sublist(4, 8)} (hum)');
+          btDataStr = 'Erreur: données capteur invalides';
+        } else {
+          btDataStr =
+              'Temp: ${temp.toStringAsFixed(2)} °C, Hum: ${hum.toStringAsFixed(2)} %';
+        }
         debugPrint('Background service: Bluetooth data read: $btDataStr');
       } else {
         btDataStr =
@@ -568,39 +606,17 @@ Future<void> _collectAndLogData(
     // IMPORTANT: Do NOT stop the service here. Allow the service to continue attempting readings.
   }
 
-  // --- Get GPS data ---
-  try {
-    debugPrint('Background service: Checking GPS service and permissions...');
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    // Check both service enablement and permission status.
-    if (serviceEnabled &&
-        (await Geolocator.checkPermission() == LocationPermission.whileInUse ||
-            await Geolocator.checkPermission() == LocationPermission.always)) {
-      debugPrint(
-        'Background service: GPS enabled and permission granted. Getting current position...',
-      );
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy:
-            LocationAccuracy.best, // Request the best available accuracy
-        timeLimit: const Duration(
-          seconds: 5,
-        ), // Added timeLimit to prevent indefinite waiting
-      );
-      lat = position.latitude;
-      lon = position.longitude;
-      accuracy = position.accuracy;
-      locationDataStr =
-          'Lat: ${lat.toStringAsFixed(6)}, Lon: ${lon.toStringAsFixed(6)}';
-      debugPrint('Background service: GPS data: $locationDataStr');
-    } else {
-      locationDataStr = 'GPS service/permission disabled or denied.';
-      debugPrint('Background service: $locationDataStr');
-    }
-  } catch (e) {
-    locationDataStr = 'Error getting location: $e';
-    debugPrint(
-      'Background service: $locationDataStr',
-    ); // Log the error internally
+  // --- Get GPS data from cached position ---
+  if (cachedPosition != null) {
+    lat = cachedPosition.latitude;
+    lon = cachedPosition.longitude;
+    accuracy = cachedPosition.accuracy;
+    locationDataStr =
+        'Lat: ${lat.toStringAsFixed(6)}, Lon: ${lon.toStringAsFixed(6)}';
+    debugPrint('Background service: GPS data (cached): $locationDataStr');
+  } else {
+    locationDataStr = 'GPS: en attente de position...';
+    debugPrint('Background service: No cached GPS position yet.');
   }
 
   // --- Append data to CSV ---
