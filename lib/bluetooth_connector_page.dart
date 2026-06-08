@@ -10,12 +10,11 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sensor_logging/widgets/bluetooth_indicator.dart';
 import 'package:sensor_logging/widgets/bluetooth_scan_popup.dart';
 import 'package:sensor_logging/widgets/connection_button.dart';
-import 'package:sensor_logging/widgets/delete_files_button.dart';
+import 'package:sensor_logging/widgets/empty_session_card.dart';
 import 'package:sensor_logging/utils.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:sensor_logging/widgets/live_status_card.dart';
 import 'package:sensor_logging/widgets/log_table.dart';
-import 'package:sensor_logging/widgets/share_data_button.dart';
 
 /// The main page widget for connecting to a Bluetooth sensor, starting/stopping logging,
 /// and displaying live sensor data and logs.
@@ -437,6 +436,17 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
       appBar: AppBar(
         title: const Text('VéloClimat'),
         elevation: 4,
+        actions: [
+          TextButton.icon(
+            onPressed: () {}, // Future action for sessions list
+            icon: const Icon(Icons.list),
+            label: const Text('Sessions'),
+          ),
+          IconButton(
+            onPressed: () {}, // Future action for settings
+            icon: const Icon(Icons.settings),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -498,61 +508,57 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
               stopLogging: _stopLogging,
               onServiceStatusChanged: _checkServiceStatus,
             ),
-            const SizedBox(height: 15),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                DeleteFilesButton(isDisabled: disableDeleteButton),
-                const SizedBox(width: 16),
-                ShareDataButton(),
-              ],
-            ),
-
             const SizedBox(height: 25),
 
-            // Live Status Section
-            LiveStatusCard(
-              connectionStatus: _connectionStatus,
-              temperature: temperature,
-              humidity: humidity,
-              latitude: latitude,
-              longitude: longitude,
-            ),
-
-            const SizedBox(height: 25),
-
-            // Latest Log Entries Section
-            Text(
-              'Dernières mesures :',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue.shade800,
+            // Conditional layout based on service state
+            if (_isServiceRunning || _isConnecting) ...[
+              // Live Status Section (shown when recording)
+              LiveStatusCard(
+                connectionStatus: _connectionStatus,
+                temperature: temperature,
+                humidity: humidity,
+                latitude: latitude,
+                longitude: longitude,
               ),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              height: 220,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade100),
+
+              const SizedBox(height: 25),
+
+              // Latest Log Entries Section
+              Text(
+                'Dernières mesures :',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
               ),
-              child: _csvLines.isEmpty || _csvLines.first.startsWith('No')
-                  ? Center(
-                      child: Text(
-                        _csvLines.first.startsWith('No')
-                            ? 'Aucune donnée'
-                            : _csvLines.first,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 13,
-                          color: Colors.black87,
+              const SizedBox(height: 10),
+              Container(
+                height: 220,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade100),
+                ),
+                child: _csvLines.isEmpty || _csvLines.first.startsWith('No')
+                    ? Center(
+                        child: Text(
+                          _csvLines.first.startsWith('No')
+                              ? 'Aucune donnée'
+                              : _csvLines.first,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                            color: Colors.black87,
+                          ),
                         ),
-                      ),
-                    )
-                  : LogTable(csvLines: _csvLines),
-            ),
+                      )
+                    : LogTable(csvLines: _csvLines),
+              ),
+            ] else ...[
+              // Empty session card (shown when not recording)
+              const EmptySessionCard(),
+            ],
             const SizedBox(height: 50), // Add some spacing at the bottom
           ],
         ),

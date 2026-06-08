@@ -33,7 +33,7 @@ class ConnectionButton extends StatelessWidget {
 
       // Show spinner if connecting, otherwise play/stop icon
       icon: isConnecting
-          ? SizedBox(
+          ? const SizedBox(
               width: 22,
               height: 22,
               child: CircularProgressIndicator(
@@ -41,13 +41,13 @@ class ConnectionButton extends StatelessWidget {
                 strokeWidth: 2.5,
               ),
             )
-          : Icon(isServiceRunning ? Icons.stop : Icons.play_arrow),
+          : Icon(isServiceRunning ? Icons.stop_circle : Icons.play_circle),
       // Button label changes based on state
       label: Text(
         isConnecting
-            ? 'Recherche du capteur...'
-            : (isServiceRunning ? 'Arrêter' : 'Démarrer'),
-        style: const TextStyle(fontSize: 18),
+            ? 'RECHERCHE DU CAPTEUR...'
+            : (isServiceRunning ? 'ARRÊTER L\'ENREGISTREMENT' : 'DÉMARRER UNE SESSION'),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
       ),
       style: ElevatedButton.styleFrom(
         backgroundColor: isServiceRunning
