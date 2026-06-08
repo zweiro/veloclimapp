@@ -187,6 +187,9 @@ class Utils {
       return; // Ensure widget is still mounted
     }
     debugPrint('UI: Showing SnackBar: $message');
-    Fluttertoast.showToast(msg: message);
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_LONG,
+    );
   }
 }

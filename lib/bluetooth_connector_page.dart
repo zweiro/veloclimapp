@@ -15,6 +15,7 @@ import 'package:sensor_logging/utils.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:sensor_logging/widgets/live_status_card.dart';
 import 'package:sensor_logging/widgets/log_table.dart';
+import 'package:sensor_logging/widgets/save_session_dialog.dart';
 
 /// The main page widget for connecting to a Bluetooth sensor, starting/stopping logging,
 /// and displaying live sensor data and logs.
@@ -47,6 +48,7 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
   StreamSubscription<BluetoothAdapterState>? _adapterStateSubscription;
 
   String? _currentCsvFilePath; // Track the current session's CSV file path
+  DateTime? _sessionStartTime; // Track when the current session started
   bool _isConnecting = false; 
 
   @override
@@ -283,6 +285,7 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
     final csvFilePath = await Utils.generateCsvFilePath(deviceName);
     setState(() {
       _currentCsvFilePath = csvFilePath;
+      _sessionStartTime = DateTime.now();
     });
 
     final service = FlutterBackgroundService();
@@ -338,17 +341,41 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
   }
 
   /// Stops the logging process by invoking the 'stopService' command on the background service.
-  void _stopLogging() {
+  Future<void> _stopLogging() async {
     debugPrint('UI: Stop Logging button pressed. Invoking stopService...');
     FlutterBackgroundService().invoke('stopService');
+
+    // Capture current values before resetting state
+    final csvFilePath = _currentCsvFilePath;
+    final startTime = _sessionStartTime;
+
     setState(() {
       _isServiceRunning = false;
       _connectionStatus = 'Stopped';
       disableDeleteButton = false;
-      _isConnecting = false; 
+      _isConnecting = false;
     });
 
-    Utils.showSnackBar('Logging stopped.', context);
+    // Show save session dialog if we have a valid file path and start time
+    if (csvFilePath != null && startTime != null && mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => SaveSessionDialog(
+          csvFilePath: csvFilePath,
+          startedAt: startTime,
+          onSaved: () {
+            Utils.showSnackBar('Session enregistrée.', context);
+          },
+        ),
+      );
+    }
+
+    // Clear session tracking
+    setState(() {
+      _currentCsvFilePath = null;
+      _sessionStartTime = null;
+    });
   }
 
   /// Reads the latest log entries from the CSV file and updates the UI display.
