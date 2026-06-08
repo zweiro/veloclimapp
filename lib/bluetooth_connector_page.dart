@@ -16,6 +16,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:sensor_logging/widgets/live_status_card.dart';
 import 'package:sensor_logging/widgets/log_table.dart';
 import 'package:sensor_logging/widgets/save_session_dialog.dart';
+import 'package:sensor_logging/pages/server_settings_page.dart';
 
 /// The main page widget for connecting to a Bluetooth sensor, starting/stopping logging,
 /// and displaying live sensor data and logs.
@@ -470,7 +471,13 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
             label: const Text('Sessions'),
           ),
           IconButton(
-            onPressed: () {}, // Future action for settings
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const ServerSettingsPage(),
+                ),
+              );
+            },
             icon: const Icon(Icons.settings),
           ),
         ],
