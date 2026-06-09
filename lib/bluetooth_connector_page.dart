@@ -17,6 +17,7 @@ import 'package:sensor_logging/widgets/live_status_card.dart';
 import 'package:sensor_logging/widgets/log_table.dart';
 import 'package:sensor_logging/widgets/save_session_dialog.dart';
 import 'package:sensor_logging/pages/server_settings_page.dart';
+import 'package:sensor_logging/pages/session_table_page.dart';
 
 /// The main page widget for connecting to a Bluetooth sensor, starting/stopping logging,
 /// and displaying live sensor data and logs.
@@ -466,7 +467,16 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
         elevation: 4,
         actions: [
           TextButton.icon(
-            onPressed: () {}, // Future action for sessions list
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const SessionTablePage(),
+                ),
+              );
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey.shade700,
+            ),
             icon: const Icon(Icons.list),
             label: const Text('Sessions'),
           ),
@@ -478,7 +488,7 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
                 ),
               );
             },
-            icon: const Icon(Icons.settings),
+            icon: Icon(Icons.settings, color: Colors.grey.shade700),
           ),
         ],
       ),
