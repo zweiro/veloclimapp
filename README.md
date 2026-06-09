@@ -18,11 +18,11 @@ This initiative is sponsored by the GEOMANUM Foundation.
  |-----------------|------------------|
  | <img width="300"  alt="image" src="https://github.com/user-attachments/assets/1317dd4b-8b86-45b4-8d8e-374c21a712a1" /> | <img width="300"  alt="image" src="https://github.com/user-attachments/assets/c5c09fc4-eb34-40d8-870b-92307212e8b3" />|
 
-# sensor_logging
+## Requirements
 
-Flutter source code for the android app used for low cost sensors (VeloClimApp)
-Tested with Android 11
-Permission problems with android 14
+- Android 11+ (known permission issues on Android 14)
+- Bluetooth and Location permissions enabled
+- VeloClimap sensor device
 
 ## Build
 
