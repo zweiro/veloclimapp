@@ -8,6 +8,7 @@ class Session {
   final String filePath;
   final DateTime createdAt;
   final DateTime endedAt;
+  final bool synced;
 
   Session({
     this.id,
@@ -15,6 +16,7 @@ class Session {
     required this.filePath,
     required this.createdAt,
     required this.endedAt,
+    this.synced = false,
   });
 
   /// Convert Session to a Map for database insertion.
@@ -25,6 +27,7 @@ class Session {
       'file_path': filePath,
       'created_at': createdAt.toIso8601String(),
       'ended_at': endedAt.toIso8601String(),
+      'synced': synced ? 1 : 0,
     };
   }
 
@@ -36,8 +39,34 @@ class Session {
       filePath: map['file_path'] as String,
       createdAt: DateTime.parse(map['created_at'] as String),
       endedAt: DateTime.parse(map['ended_at'] as String),
+      synced: (map['synced'] as int?) == 1,
     );
   }
+
+  /// Create a copy of this session with updated fields.
+  Session copyWith({
+    int? id,
+    String? name,
+    String? filePath,
+    DateTime? createdAt,
+    DateTime? endedAt,
+    bool? synced,
+  }) {
+    return Session(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      filePath: filePath ?? this.filePath,
+      createdAt: createdAt ?? this.createdAt,
+      endedAt: endedAt ?? this.endedAt,
+      synced: synced ?? this.synced,
+    );
+  }
+
+  /// Get the filename from the file path.
+  String get fileName => filePath.split('/').last;
+
+  /// Get the duration of the session.
+  Duration get duration => endedAt.difference(createdAt);
 }
 
 /// Singleton service for database operations.
@@ -61,8 +90,9 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -74,9 +104,17 @@ class DatabaseService {
         name TEXT NOT NULL,
         file_path TEXT NOT NULL UNIQUE,
         created_at TEXT NOT NULL,
-        ended_at TEXT NOT NULL
+        ended_at TEXT NOT NULL,
+        synced INTEGER NOT NULL DEFAULT 0
       )
     ''');
+  }
+
+  /// Upgrade the database schema.
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE sessions ADD COLUMN synced INTEGER NOT NULL DEFAULT 0');
+    }
   }
 
   /// Insert a new session into the database.
@@ -89,12 +127,25 @@ class DatabaseService {
     );
   }
 
-  /// Get all sessions ordered by creation date (newest first).
-  Future<List<Session>> getAllSessions() async {
+  /// Get all sessions with optional filtering and sorting.
+  Future<List<Session>> getAllSessions({
+    bool? syncedFilter,
+    bool newestFirst = true,
+  }) async {
     final db = await database;
+    String? where;
+    List<dynamic>? whereArgs;
+
+    if (syncedFilter != null) {
+      where = 'synced = ?';
+      whereArgs = [syncedFilter ? 1 : 0];
+    }
+
     final maps = await db.query(
       'sessions',
-      orderBy: 'created_at DESC',
+      where: where,
+      whereArgs: whereArgs,
+      orderBy: newestFirst ? 'created_at DESC' : 'created_at ASC',
     );
     return maps.map((map) => Session.fromMap(map)).toList();
   }
@@ -131,6 +182,17 @@ class DatabaseService {
       session.toMap(),
       where: 'id = ?',
       whereArgs: [session.id],
+    );
+  }
+
+  /// Mark a session as synced.
+  Future<int> markSessionAsSynced(int id) async {
+    final db = await database;
+    return await db.update(
+      'sessions',
+      {'synced': 1},
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 
