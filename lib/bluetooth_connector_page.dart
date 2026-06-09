@@ -140,7 +140,7 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
       debugPrint('UI: Received stopService command.');
       setState(() {
         _isServiceRunning = false;
-        _connectionStatus = 'Service Stopped';
+        _connectionStatus = 'Service arrêté';
         _characteristicData = 'Aucune donnée';
         _locationData = 'Aucune donnée GPS';
         disableDeleteButton = false;
@@ -180,7 +180,7 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
     // Perform pre-checks before attempting to start the service:
     if (Platform.isAndroid && !await Permission.notification.isGranted) {
       Utils.showSnackBar(
-        'Notification permission is required to run in the background.',
+        'Permission de notification requise pour fonctionner en arrière-plan.',
         context,
       );
       debugPrint('UI: Notification permission denied.');
@@ -190,7 +190,7 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
     if (!(await Permission.locationAlways.isGranted ||
         await Permission.locationWhenInUse.isGranted)) {
       Utils.showSnackBar(
-        'Location permission (Always or While in Use) is required for GPS logging.',
+        'Permission de localisation requise pour l\'enregistrement GPS.',
         context,
       );
       debugPrint('UI: Location permission denied.');
@@ -204,7 +204,7 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
 
     if (currentBluetoothState != BluetoothAdapterState.on) {
       Utils.showSnackBar(
-        'Bluetooth is OFF. Attempting to turn on Bluetooth...',
+        'Bluetooth désactivé. Tentative d\'activation...',
         context,
       );
       debugPrint('UI: Bluetooth is OFF, attempting to turn on...');
@@ -219,14 +219,14 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
         debugPrint('UI: Bluetooth adapter successfully turned ON.');
       } on TimeoutException {
         Utils.showSnackBar(
-          'Bluetooth did not turn on in time. Please enable it manually.',
+          'Le Bluetooth ne s\'est pas activé à temps. Veuillez l\'activer manuellement.',
           context,
         );
         debugPrint('UI: Bluetooth did not turn on within timeout.');
         return;
       } catch (e) {
         Utils.showSnackBar(
-          'Error turning on Bluetooth: $e. Please enable it manually.',
+          'Erreur d\'activation Bluetooth: $e. Veuillez l\'activer manuellement.',
           context,
         );
         debugPrint('UI: Error turning on Bluetooth: $e');
@@ -237,7 +237,7 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
         // This case should ideally not be hit if the timeout and where clause work,
         // but as a final safeguard.
         Utils.showSnackBar(
-          'Bluetooth is still off despite attempt. Please enable it manually.',
+          'Le Bluetooth est toujours désactivé. Veuillez l\'activer manuellement.',
           context,
         );
         debugPrint(
@@ -295,7 +295,7 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
     if (isRunning) {
       // If service is already running, stop it gracefully before restarting to ensure a clean start.
       Utils.showSnackBar(
-        'Stopping existing service before restart...',
+        'Arrêt du service existant avant redémarrage...',
         context,
       );
       debugPrint('UI: Service already running, invoking stopService...');
@@ -325,17 +325,17 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
 
       setState(() {
         _isServiceRunning = true;
-        _connectionStatus = 'Starting Service...';
+        _connectionStatus = 'Démarrage du service...';
         disableDeleteButton = true;
         _isConnecting = false; 
       });
-      Utils.showSnackBar('Logging started.', context);
+      Utils.showSnackBar('Enregistrement démarré.', context);
     } catch (e) {
-      Utils.showSnackBar('Failed to start service: ${e.toString()}', context);
+      Utils.showSnackBar('Échec du démarrage: ${e.toString()}', context);
       debugPrint('UI: Failed to start service: $e');
       setState(() {
         _isServiceRunning = false;
-        _connectionStatus = 'Service Start Failed';
+        _connectionStatus = 'Échec du démarrage';
         disableDeleteButton = false;
         _isConnecting = false; 
       });
@@ -353,7 +353,7 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
 
     setState(() {
       _isServiceRunning = false;
-      _connectionStatus = 'Stopped';
+      _connectionStatus = 'Arrêté';
       disableDeleteButton = false;
       _isConnecting = false;
     });
