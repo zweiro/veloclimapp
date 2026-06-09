@@ -54,7 +54,6 @@ class _SessionTablePageState extends State<SessionTablePage> {
         });
       }
     } catch (e) {
-      debugPrint('Error loading sessions: $e');
       if (mounted) {
         setState(() => _isLoading = false);
         Utils.showSnackBar('Erreur lors du chargement des sessions', context);

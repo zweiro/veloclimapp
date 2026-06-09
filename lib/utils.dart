@@ -18,41 +18,33 @@ class Utils {
   /// background operation, and file storage. It handles Android-specific permission
   /// requirements for newer versions.
   static Future<void> requestPermissions() async {
-    debugPrint('Requesting permissions...');
-
     // Request notification permission for Android 13+ to ensure foreground service notifications work.
     if (Platform.isAndroid) {
       var status = await Permission.notification.status;
       if (status.isDenied) {
-        debugPrint('Requesting notification permission...');
         await Permission.notification.request();
       }
     }
 
     // Request Bluetooth permissions for Android 12 (API 31) and above
     if (Platform.isAndroid && await Permission.bluetooth.status.isDenied) {
-      debugPrint('Requesting general Bluetooth permission...');
       await Permission.bluetooth.request();
     }
     if (Platform.isAndroid && await Permission.bluetoothScan.status.isDenied) {
-      debugPrint('Requesting Bluetooth Scan permission...');
       await Permission.bluetoothScan.request();
     }
     if (Platform.isAndroid &&
         await Permission.bluetoothConnect.status.isDenied) {
-      debugPrint('Requesting Bluetooth Connect permission...');
       await Permission.bluetoothConnect.request();
     }
     if (Platform.isAndroid &&
         await Permission.bluetoothAdvertise.status.isDenied) {
-      debugPrint('Requesting Bluetooth Advertise permission...');
       await Permission.bluetoothAdvertise.request();
     }
 
     // Request location permissions. Prioritize "Always" for continuous background GPS logging.
     var locationStatus = await Permission.location.status;
     if (locationStatus.isDenied) {
-      debugPrint('Requesting location permission...');
       await Permission.location.request();
     }
 
@@ -61,7 +53,6 @@ class Utils {
     if (await Permission.location.isGranted) {
       var backgroundLocationStatus = await Permission.locationAlways.status;
       if (backgroundLocationStatus.isDenied) {
-        debugPrint('Requesting background location permission...');
         // This will open a dialog to guide the user to settings if needed for "Always" permission.
         await Permission.locationAlways.request();
       }
@@ -71,11 +62,9 @@ class Utils {
     if (Platform.isAndroid) {
       var storageStatus = await Permission.storage.status;
       if (storageStatus.isDenied) {
-        debugPrint('Requesting storage permission...');
         await Permission.storage.request();
       }
     }
-    debugPrint('Permissions requested.');
   }
 
   /// Determines the file path for the CSV log.
@@ -181,12 +170,8 @@ class Utils {
   /// the message is not shown.
   static void showSnackBar(String message, BuildContext context) {
     if (!context.mounted) {
-      debugPrint(
-        'UI: SnackBar message "$message" not shown, widget not mounted.',
-      );
       return; // Ensure widget is still mounted
     }
-    debugPrint('UI: Showing SnackBar: $message');
     Fluttertoast.showToast(
       msg: message,
       toastLength: Toast.LENGTH_LONG,

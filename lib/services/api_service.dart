@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Service for communicating with the VeloClimap server.
@@ -17,10 +16,8 @@ class ApiService {
           .get(uri, headers: {'Content-Type': 'application/json'})
           .timeout(const Duration(seconds: 5));
 
-      debugPrint('ApiService: Ping response status: ${response.statusCode}');
       return response.statusCode == 200;
     } catch (e) {
-      debugPrint('ApiService: Ping error: $e');
       return false;
     }
   }
@@ -33,7 +30,6 @@ class ApiService {
     required List<String> filePaths,
   }) async {
     if (filePaths.isEmpty) {
-      debugPrint('ApiService: No files to upload');
       return false;
     }
 
@@ -41,7 +37,6 @@ class ApiService {
       // Create ZIP archive from the files
       final zipFile = await _createZipFromFiles(filePaths);
       if (zipFile == null) {
-        debugPrint('ApiService: Failed to create ZIP file');
         return false;
       }
 
@@ -55,25 +50,20 @@ class ApiService {
         await http.MultipartFile.fromPath('file', zipFile.path),
       );
 
-      debugPrint('ApiService: Uploading to $uri with X-Code: $sessionCode');
       final streamedResponse = await request.send().timeout(
         const Duration(seconds: 30),
       );
       final response = await http.Response.fromStream(streamedResponse);
 
-      debugPrint('ApiService: Upload response status: ${response.statusCode}');
-      debugPrint('ApiService: Upload response body: ${response.body}');
-
       // Clean up temp ZIP file
       try {
         await zipFile.delete();
       } catch (e) {
-        debugPrint('ApiService: Failed to delete temp ZIP: $e');
+        // Failed to delete temp ZIP
       }
 
       return response.statusCode == 200;
     } catch (e) {
-      debugPrint('ApiService: Upload error: $e');
       return false;
     }
   }
@@ -106,7 +96,6 @@ class ApiService {
 
       return zipFile;
     } catch (e) {
-      debugPrint('ApiService: Error creating ZIP: $e');
       return null;
     }
   }

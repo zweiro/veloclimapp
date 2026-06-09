@@ -56,7 +56,6 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
   @override
   void initState() {
     super.initState();
-    debugPrint('UI: initState called.');
     _checkServiceStatus(); // Check the initial status of the background service
     _listenToService(); // Start listening for updates from the background service
     _readLatestCsvLines(); // Read and display initial CSV log entries
@@ -67,7 +66,6 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
   /// Also stops the logging service if Bluetooth is turned off.
   void _listenToBluetoothAdapterState() {
     _adapterStateSubscription = FlutterBluePlus.adapterState.listen((state) {
-      debugPrint('UI: Bluetooth adapter state changed to: $state');
       setState(() {
         _bluetoothAdapterState =
             state; // Update the UI with the new Bluetooth state
@@ -85,7 +83,6 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
 
   /// Checks if the background service is currently running and updates the UI state.
   void _checkServiceStatus() async {
-    debugPrint('UI: Checking background service status...');
     bool isRunning = await FlutterBackgroundService().isRunning();
     setState(() {
       _isServiceRunning = isRunning;
@@ -94,23 +91,15 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
           : 'Service arrêté';
       disableDeleteButton = isRunning || _isConnecting ? true : false;
     });
-    debugPrint(
-      'UI: Background service status: $_connectionStatus (isRunning: $_isServiceRunning)',
-    );
   }
 
   /// Listens for messages (`updateUI`, `stopService`) from the background service
   /// and updates the UI accordingly.
   void _listenToService() {
-    debugPrint('UI: Listening for service updates...');
     FlutterBackgroundService().on('updateUI').listen((data) {
       if (!mounted || data == null) {
-        debugPrint(
-          'UI: updateUI received, but widget not mounted or data is null.',
-        );
         return;
       }
-      debugPrint('UI: Received updateUI: $data');
       setState(() {
         _connectionStatus = data['status'] ?? _connectionStatus;
         _characteristicData = data['btData'] ?? _characteristicData;
@@ -134,10 +123,8 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
 
     FlutterBackgroundService().on('stopService').listen((event) {
       if (!mounted) {
-        debugPrint('UI: stopService received, but widget not mounted.');
         return;
       }
-      debugPrint('UI: Received stopService command.');
       setState(() {
         _isServiceRunning = false;
         _connectionStatus = 'Service arrêté';
@@ -151,7 +138,6 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
 
   @override
   void dispose() {
-    debugPrint('UI: dispose called. Cleaning up...');
     _deviceNameController.dispose(); // Dispose of the text editing controller
     _adapterStateSubscription
         ?.cancel(); // Cancel the Bluetooth state subscription
@@ -166,16 +152,13 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
         'Veuillez entrer le nom du capteur Bluetooth.',
         context,
       );
-      debugPrint('UI: Device name is empty.');
       return;
     }
-    debugPrint('UI: Start Logging button pressed.');
     setState(() {
-      _isConnecting = true; 
+      _isConnecting = true;
     });
 
     await Utils.requestPermissions();
-    debugPrint('UI: Permissions re-checked.');
 
     // Perform pre-checks before attempting to start the service:
     if (Platform.isAndroid && !await Permission.notification.isGranted) {
@@ -183,7 +166,6 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
         'Permission de notification requise pour fonctionner en arrière-plan.',
         context,
       );
-      debugPrint('UI: Notification permission denied.');
       return;
     }
     // Check for either LocationAlways or LocationWhenInUse for GPS logging.
@@ -193,21 +175,18 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
         'Permission de localisation requise pour l\'enregistrement GPS.',
         context,
       );
-      debugPrint('UI: Location permission denied.');
       return;
     }
 
     // Get the *current* Bluetooth adapter state directly before starting.
     BluetoothAdapterState currentBluetoothState =
         await FlutterBluePlus.adapterState.first;
-    debugPrint('UI: Current Bluetooth adapter state: $currentBluetoothState');
 
     if (currentBluetoothState != BluetoothAdapterState.on) {
       Utils.showSnackBar(
         'Bluetooth désactivé. Tentative d\'activation...',
         context,
       );
-      debugPrint('UI: Bluetooth is OFF, attempting to turn on...');
       await FlutterBluePlus.turnOn(); // Attempt to turn on Bluetooth programmatically
 
       // Wait for the Bluetooth adapter to actually become ON, with a timeout.
@@ -216,20 +195,17 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
             .where((s) => s == BluetoothAdapterState.on)
             .first
             .timeout(const Duration(seconds: 10)); // Max 10 seconds to turn on
-        debugPrint('UI: Bluetooth adapter successfully turned ON.');
       } on TimeoutException {
         Utils.showSnackBar(
           'Le Bluetooth ne s\'est pas activé à temps. Veuillez l\'activer manuellement.',
           context,
         );
-        debugPrint('UI: Bluetooth did not turn on within timeout.');
         return;
       } catch (e) {
         Utils.showSnackBar(
           'Erreur d\'activation Bluetooth: $e. Veuillez l\'activer manuellement.',
           context,
         );
-        debugPrint('UI: Error turning on Bluetooth: $e');
         return;
       }
 
@@ -239,9 +215,6 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
         Utils.showSnackBar(
           'Le Bluetooth est toujours désactivé. Veuillez l\'activer manuellement.',
           context,
-        );
-        debugPrint(
-          'UI: Bluetooth state check failed even after turnOn attempt.',
         );
         return;
       }
@@ -279,7 +252,6 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
     final String deviceName = _deviceNameController.text.trim();
     if (deviceName.isEmpty) {
       Utils.showSnackBar('VC_SENS_XXXXXX', context);
-      debugPrint('UI: Device name is empty.');
       return;
     }
 
@@ -298,7 +270,6 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
         'Arrêt du service existant avant redémarrage...',
         context,
       );
-      debugPrint('UI: Service already running, invoking stopService...');
       service.invoke('stopService');
       // Wait until the service is really stopped
       int tries = 0;
@@ -306,12 +277,10 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
         await Future.delayed(const Duration(milliseconds: 200));
         tries++;
       }
-      debugPrint('UI: Service stopped after ${tries * 200} ms.');
     }
 
     // Start the background service and send the 'startLogging' command.
     try {
-      debugPrint('UI: Starting background service...');
       await service.startService();
       await Future.delayed(const Duration(milliseconds: 1000));
       service.invoke('setAsForeground');
@@ -319,20 +288,16 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
         'deviceName': deviceName,
         'csvFilePath': csvFilePath,
       });
-      debugPrint(
-        'UI: Background service started and startLogging command sent.',
-      );
 
       setState(() {
         _isServiceRunning = true;
         _connectionStatus = 'Démarrage du service...';
         disableDeleteButton = true;
-        _isConnecting = false; 
+        _isConnecting = false;
       });
       Utils.showSnackBar('Enregistrement démarré.', context);
     } catch (e) {
       Utils.showSnackBar('Échec du démarrage: ${e.toString()}', context);
-      debugPrint('UI: Failed to start service: $e');
       setState(() {
         _isServiceRunning = false;
         _connectionStatus = 'Échec du démarrage';
@@ -344,7 +309,6 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
 
   /// Stops the logging process by invoking the 'stopService' command on the background service.
   Future<void> _stopLogging() async {
-    debugPrint('UI: Stop Logging button pressed. Invoking stopService...');
     FlutterBackgroundService().invoke('stopService');
 
     // Capture current values before resetting state
@@ -383,11 +347,9 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
   /// Reads the latest log entries from the CSV file and updates the UI display.
   Future<void> _readLatestCsvLines() async {
     if (_currentCsvFilePath == null) return;
-    debugPrint('UI: Reading latest CSV lines...');
     final file = File(_currentCsvFilePath!);
     if (!await file.exists()) {
       setState(() => _csvLines = ['No log data yet.']);
-      debugPrint('UI: CSV file does not exist.');
       return;
     }
     try {
@@ -402,20 +364,13 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
             (lines.length - numLinesToShow).clamp(1, lines.length),
           ),
         );
-        debugPrint(
-          'UI: Displaying last ${lines.length > 1 ? (lines.length - 1) : 0} CSV entries.',
-        );
       } else {
         setState(
           () => _csvLines = ['No data entries.'],
         ); // Only header exists or file is empty
-        debugPrint('UI: CSV file exists but no data entries found.');
       }
     } catch (e) {
       setState(() => _csvLines = ['Error reading log file: $e']);
-      debugPrint(
-        'UI: Error reading CSV file: $e',
-      );
     }
   }
 

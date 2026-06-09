@@ -73,14 +73,12 @@ class _SaveSessionDialogState extends State<SaveSessionDialog> {
       );
 
       await DatabaseService.instance.insertSession(session);
-      debugPrint('Session saved: $sessionName');
 
       if (mounted) {
         Navigator.of(context).pop();
         widget.onSaved?.call();
       }
     } catch (e) {
-      debugPrint('Error saving session: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erreur lors de l\'enregistrement: $e')),

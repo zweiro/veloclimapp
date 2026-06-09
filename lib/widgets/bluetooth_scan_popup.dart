@@ -38,14 +38,12 @@ class _BluetoothScanPopupState extends State<BluetoothScanPopup> {
     // Check Bluetooth adapter state before scanning
     BluetoothAdapterState currentBluetoothState =
         await FlutterBluePlus.adapterState.first;
-    debugPrint('UI: Current Bluetooth adapter state: $currentBluetoothState');
 
     if (currentBluetoothState != BluetoothAdapterState.on) {
       Utils.showSnackBar(
         'Bluetooth is OFF. Attempting to turn on Bluetooth...',
         context,
       );
-      debugPrint('UI: Bluetooth is OFF, attempting to turn on...');
       await FlutterBluePlus.turnOn();
 
       // Wait for Bluetooth to turn ON, with timeout
@@ -54,20 +52,17 @@ class _BluetoothScanPopupState extends State<BluetoothScanPopup> {
             .where((s) => s == BluetoothAdapterState.on)
             .first
             .timeout(const Duration(seconds: 10));
-        debugPrint('UI: Bluetooth adapter successfully turned ON.');
       } on TimeoutException {
         Utils.showSnackBar(
           'Bluetooth did not turn on in time. Please enable it manually.',
           context,
         );
-        debugPrint('UI: Bluetooth did not turn on within timeout.');
         return;
       } catch (e) {
         Utils.showSnackBar(
           'Error turning on Bluetooth: $e. Please enable it manually.',
           context,
         );
-        debugPrint('UI: Error turning on Bluetooth: $e');
         return;
       }
 
@@ -75,9 +70,6 @@ class _BluetoothScanPopupState extends State<BluetoothScanPopup> {
         Utils.showSnackBar(
           'Bluetooth is still off despite attempt. Please enable it manually.',
           context,
-        );
-        debugPrint(
-          'UI: Bluetooth state check failed even after turnOn attempt.',
         );
         return;
       }
@@ -90,7 +82,6 @@ class _BluetoothScanPopupState extends State<BluetoothScanPopup> {
         'Location permission (Always or While in Use) is required for GPS logging.',
         context,
       );
-      debugPrint('UI: Location permission denied.');
       return;
     }
 
@@ -197,14 +188,12 @@ class _BluetoothScanDialogState extends State<_BluetoothScanDialog> {
     // Check Bluetooth adapter state before scanning
     BluetoothAdapterState currentBluetoothState =
         await FlutterBluePlus.adapterState.first;
-    debugPrint('UI: Current Bluetooth adapter state: $currentBluetoothState');
 
     if (currentBluetoothState != BluetoothAdapterState.on) {
       Utils.showSnackBar(
         'Bluetooth is OFF. Attempting to turn on Bluetooth...',
         context,
       );
-      debugPrint('UI: Bluetooth is OFF, attempting to turn on...');
       await FlutterBluePlus.turnOn();
 
       // Wait for Bluetooth to turn ON, with timeout
@@ -213,20 +202,17 @@ class _BluetoothScanDialogState extends State<_BluetoothScanDialog> {
             .where((s) => s == BluetoothAdapterState.on)
             .first
             .timeout(const Duration(seconds: 10));
-        debugPrint('UI: Bluetooth adapter successfully turned ON.');
       } on TimeoutException {
         Utils.showSnackBar(
           'Bluetooth did not turn on in time. Please enable it manually.',
           context,
         );
-        debugPrint('UI: Bluetooth did not turn on within timeout.');
         return;
       } catch (e) {
         Utils.showSnackBar(
           'Error turning on Bluetooth: $e. Please enable it manually.',
           context,
         );
-        debugPrint('UI: Error turning on Bluetooth: $e');
         return;
       }
 
@@ -234,9 +220,6 @@ class _BluetoothScanDialogState extends State<_BluetoothScanDialog> {
         Utils.showSnackBar(
           'Bluetooth is still off despite attempt. Please enable it manually.',
           context,
-        );
-        debugPrint(
-          'UI: Bluetooth state check failed even after turnOn attempt.',
         );
         return;
       }
@@ -249,7 +232,6 @@ class _BluetoothScanDialogState extends State<_BluetoothScanDialog> {
         'Location permission (Always or While in Use) is required for GPS logging.',
         context,
       );
-      debugPrint('UI: Location permission denied.');
       return;
     }
 

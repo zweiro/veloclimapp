@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:csv/csv.dart';
-import 'package:flutter/foundation.dart';
 
 const List<String> csvHeaders = [
   'Timestamp',
@@ -22,7 +21,6 @@ Future<void> ensureCsvHeader(String? csvFilePath) async {
   if (!await file.exists() || (await file.readAsString()).trim().isEmpty) {
     final csvString = const ListToCsvConverter().convert([csvHeaders]);
     await file.writeAsString('$csvString\n', mode: FileMode.write);
-    debugPrint('CSV header ensured.');
   }
 }
 
@@ -30,13 +28,11 @@ Future<bool> appendToCsv(List<dynamic> row, String? csvFilePath) async {
   if (csvFilePath == null) return false;
 
   if (row.length != csvColumnCount) {
-    debugPrint('CSV ERROR: Invalid row length ${row.length}, expected $csvColumnCount.');
     return false;
   }
 
   final timestamp = row[0]?.toString() ?? '';
   if (!iso8601Pattern.hasMatch(timestamp)) {
-    debugPrint('CSV ERROR: Invalid timestamp format "$timestamp".');
     return false;
   }
 
@@ -44,7 +40,6 @@ Future<bool> appendToCsv(List<dynamic> row, String? csvFilePath) async {
   final csvString = const ListToCsvConverter().convert([row]).trim();
 
   if (csvString.isEmpty) {
-    debugPrint('CSV ERROR: Empty row generated.');
     return false;
   }
 
@@ -55,7 +50,6 @@ Future<bool> appendToCsv(List<dynamic> row, String? csvFilePath) async {
     await sink.close();
     return true;
   } catch (e) {
-    debugPrint('CSV ERROR: Failed to write row: $e');
     return false;
   }
 }

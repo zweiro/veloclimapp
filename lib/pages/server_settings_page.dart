@@ -45,7 +45,6 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         });
       }
     } catch (e) {
-      debugPrint('Error loading settings: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
