@@ -97,7 +97,6 @@ Future<void> initializeService() async {
 void onStart(ServiceInstance service) async {
   // Ensure Flutter plugins (like FlutterBluePlus and Geolocator) are initialized in this isolate.
   DartPluginRegistrant.ensureInitialized();
-  debugPrint('Background service: onStart initiated.');
 
   // --- Background Task State Variables ---
   String? deviceName;
@@ -123,21 +122,16 @@ void onStart(ServiceInstance service) async {
   if (service is AndroidServiceInstance) {
     service.on('setAsForeground').listen((event) {
       service.setAsForegroundService(); // Puts the service into foreground mode
-      debugPrint('Background service: Set as foreground.');
     });
 
     service.on('setAsBackground').listen((event) {
       service.setAsBackgroundService(); // Puts the service into background mode
-      debugPrint('Background service: Set as background.');
     });
   }
 
   // --- Stop Service Command Listener ---
   // This listener handles requests from the UI to stop the background service.
   service.on('stopService').listen((event) async {
-    debugPrint(
-      'Background service: stopService command received. Cleaning up...',
-    );
     // Clean up all resources to prevent leaks and ensure a graceful shutdown.
     logTimer
         ?.cancel(); // Stop the periodic logging timer - Removed 'await' as cancel() returns void
@@ -154,33 +148,23 @@ void onStart(ServiceInstance service) async {
       if (connectedDevice != null &&
           (await connectedDevice!.connectionState.first) ==
               BluetoothConnectionState.connected) {
-        debugPrint(
-          'Background service: Disconnecting from Bluetooth device...',
-        );
         await connectedDevice!.disconnect();
-        debugPrint(
-          'Background service: Bluetooth device disconnected cleanly.',
-        );
       }
     } catch (e) {
-      debugPrint('Background service: Error disconnecting device on stop: $e');
+      // Error disconnecting device on stop
     }
 
     // Stop any active Bluetooth scanning.
     try {
       // Access the current value of the isScanning stream using .first
       if (await FlutterBluePlus.isScanning.first) {
-        debugPrint('Background service: Stopping Bluetooth scan...');
         await FlutterBluePlus.stopScan();
-
-        debugPrint('Background service: Bluetooth scan stopped cleanly.');
       }
     } catch (e) {
-      debugPrint('Background service: Error stopping scan on stop: $e');
+      // Error stopping scan on stop
     }
 
     service.stopSelf(); // Stops the background service itself
-    debugPrint('Background service: Service stopped itself.');
     // Update UI to reflect that the service has stopped and clear data displays.
     service.invoke('updateUI', {
       'status': 'Service arrêté',
@@ -192,9 +176,6 @@ void onStart(ServiceInstance service) async {
   // --- Listen for Bluetooth Adapter State Changes ---
   // This is crucial for handling cases where Bluetooth is turned off by the user.
   adapterStateSubscription = FlutterBluePlus.adapterState.listen((state) {
-    debugPrint(
-      'Background service: Bluetooth adapter state changed to: $state',
-    );
     if (state != BluetoothAdapterState.on) {
       // If Bluetooth is off or unavailable, notify the UI and stop the logging service.
       service.invoke('updateUI', {
@@ -202,9 +183,6 @@ void onStart(ServiceInstance service) async {
         'btData': 'Bluetooth désactivé',
         'locationData': 'Aucune donnée GPS',
       });
-      debugPrint(
-        'Background service: Bluetooth adapter turned off. Stopping service.',
-      );
       service.invoke('stopService'); // Request to stop the service
     } else {
       // Bluetooth is ON, update status if logging is active.
@@ -218,9 +196,7 @@ void onStart(ServiceInstance service) async {
 
   // --- Listen for 'startLogging' command from the UI ---
   service.on('startLogging').listen((data) async {
-    debugPrint('Background service: startLogging command received.');
     if (data == null) {
-      debugPrint('Background service: startLogging data is null, returning.');
       return;
     }
     deviceName = data['deviceName'];
@@ -238,18 +214,15 @@ void onStart(ServiceInstance service) async {
       ),
     ).listen((Position position) {
       lastKnownPosition = position;
-      debugPrint('Background service: GPS position updated: ${position.latitude}, ${position.longitude}');
     }, onError: (error) {
-      debugPrint('Background service: GPS stream error: $error');
+      // GPS stream error
     });
-    debugPrint('Background service: GPS stream initialized.');
 
     // Prevent starting logging if it's already active.
     if (logTimer?.isActive ?? false) {
       service.invoke('updateUI', {
         'status': 'Journalisation déjà en cours pour "$deviceName".',
       });
-      debugPrint('Background service: Logging already active.');
       return;
     }
 
@@ -259,7 +232,6 @@ void onStart(ServiceInstance service) async {
       'locationData': 'Aucune donnée GPS',
       'isScanning': true, // Indicate that scanning is in progress
     });
-    debugPrint('Background service: UI updated to scanning status.');
 
     // Explicitly check if Bluetooth is enabled before starting any scan/connection.
     if (await FlutterBluePlus.adapterState.first != BluetoothAdapterState.on) {
@@ -268,23 +240,15 @@ void onStart(ServiceInstance service) async {
             'Bluetooth désactivé. Impossible de démarrer la journalisation.',
       });
       service.invoke('stopService'); // Stop service as Bluetooth is required
-      debugPrint('Background service: Bluetooth is OFF, stopping service.');
       return;
     }
 
     // --- Connect to Bluetooth Device ---
     try {
-      debugPrint(
-        'Background service: Attempting to connect to Bluetooth device.',
-      );
-
       // Clean up previous state
       if (connectedDevice != null &&
           (await connectedDevice!.connectionState.first) ==
               BluetoothConnectionState.connected) {
-        debugPrint(
-          'Background service: Previous device was connected, disconnecting...',
-        );
         await connectedDevice!.disconnect();
       }
       connectionStateSubscription?.cancel();
@@ -293,9 +257,6 @@ void onStart(ServiceInstance service) async {
       FlutterBluePlus.scanResults.drain();
 
       // Start scan with timeout
-      debugPrint(
-        'Background service: Starting new Bluetooth scan for 15 seconds...',
-      );
       await FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
 
       ScanResult? foundResult;
@@ -338,24 +299,17 @@ void onStart(ServiceInstance service) async {
       connectedDevice = foundResult?.device;
 
       // --- Connect to the discovered device ---
-      debugPrint(
-        'Background service: Connecting to ${connectedDevice!.platformName}...',
-      );
       await connectedDevice!.connect(autoConnect: false);
       service.invoke('updateUI', {
         'status': 'Connexion à $deviceName. Initialisation...',
         'isScanning': false, // Scanning is no longer active
       });
-      debugPrint('Background service: Connected. Discovering services...');
 
       // Listen for disconnection events specific to this connected device.
       // If the device disconnects unexpectedly, we'll stop the service cleanly.
       connectionStateSubscription = connectedDevice!.connectionState.listen((
         state,
       ) async {
-        debugPrint(
-          'Background service: Device connection state changed to: $state',
-        );
         if (state == BluetoothConnectionState.disconnected) {
           isReconnecting = true;
           reconnectionAttempts++;
@@ -368,10 +322,6 @@ void onStart(ServiceInstance service) async {
                 'Erreur : $deviceName déconnecté. Tentative de reconnexion...',
             'isScanning': true,
           });
-
-          debugPrint(
-            'Background service: Device disconnected. Trying to reconnect... (attempt $reconnectionAttempts)',
-          );
 
           bool reconnected = false;
           String reconnectMsg = '';
@@ -421,7 +371,6 @@ void onStart(ServiceInstance service) async {
             });
           }
           isReconnecting = false;
-          debugPrint('Background service: $reconnectMsg');
 
           if (!reconnected) {
             if (reconnectionAttempts >= 3) {
@@ -444,20 +393,11 @@ void onStart(ServiceInstance service) async {
       // Discover services and find the target characteristic.
       List<BluetoothService> services = await connectedDevice!
           .discoverServices();
-      debugPrint('Background service: Discovered ${services.length} services.');
       for (var s in services) {
-        debugPrint('Background service: Service UUID: ${s.uuid}');
         if (s.uuid == SERVICE_UUID) {
-          debugPrint(
-            'Background service: Found target SERVICE_UUID: ${s.uuid}',
-          );
           for (var c in s.characteristics) {
-            debugPrint('Background service: Characteristic UUID: ${c.uuid}');
             if (c.uuid == CHARACTERISTIC_UUID) {
               targetCharacteristic = c;
-              debugPrint(
-                'Background service: Found target CHARACTERISTIC_UUID: ${c.uuid}',
-              );
               break; // Characteristic found
             }
           }
@@ -469,9 +409,6 @@ void onStart(ServiceInstance service) async {
         service.invoke('updateUI', {
           'status': 'Caractéristique non trouvée pour $deviceName.',
         });
-        debugPrint(
-          'Background service: Target characteristic not found. Disconnecting...',
-        );
         await connectedDevice!.disconnect(); // Disconnect cleanly
         service.invoke('stopService');
         return;
@@ -479,13 +416,11 @@ void onStart(ServiceInstance service) async {
 
       // --- Start Periodic Data Collection & Logging ---
       // This timer will trigger the data collection function at a fixed interval.
-      debugPrint('Background service: Starting periodic log timer.');
       logTimer = Timer.periodic(const Duration(seconds: 1), (
         timer,
       ) async {
         // Skip if reconnecting or already collecting (prevents concurrent writes)
         if (isReconnecting || isCollecting) {
-          debugPrint('Background service: Skipping tick (reconnecting=$isReconnecting, collecting=$isCollecting)');
           return;
         }
         if (connectedDevice != null && targetCharacteristic != null) {
@@ -506,9 +441,6 @@ void onStart(ServiceInstance service) async {
             'status':
                 'Error: Bluetooth device/characteristic unavailable. Stopping.',
           });
-          debugPrint(
-            'Background service: Device or characteristic became null during logging. Stopping.',
-          );
           service.invoke('stopService');
         }
       });
@@ -516,7 +448,6 @@ void onStart(ServiceInstance service) async {
       service.invoke('updateUI', {
         'status': 'Connecté. Journalisation toutes les secondes.',
       });
-      debugPrint('Background service: Logging successfully initiated.');
     } catch (e) {
       // Catch any errors during Bluetooth scanning, connection, or service discovery.
       service.invoke('updateUI', {
@@ -525,9 +456,6 @@ void onStart(ServiceInstance service) async {
         'locationData': 'Aucune donnée GPS',
         'showToast': 'Erreur Bluetooth : ${e.toString()}',
       });
-      debugPrint(
-        'Background service: Critical Bluetooth error during setup: $e',
-      );
       service.invoke('stopService');
     }
   });
@@ -542,7 +470,6 @@ Future<void> _collectAndLogData(
   String? csvFilePath,
   Position? cachedPosition,
 ) async {
-  debugPrint('Background service: _collectAndLogData called.');
   final now = DateTime.now();
   String timestamp = now
       .toIso8601String(); // ISO 8601 format for consistent timestamps
@@ -553,17 +480,12 @@ Future<void> _collectAndLogData(
 
   // --- Get Bluetooth data ---
   try {
-    debugPrint('Background service: Checking Bluetooth connection state...');
     // Check connection state *immediately* before attempting to read the characteristic.
     // This helps avoid errors if the device disconnects right before a read.
     if (await device.connectionState.first ==
         BluetoothConnectionState.connected) {
-      debugPrint(
-        'Background service: Device connected. Attempting to read characteristic...',
-      );
       List<int> value = await characteristic
           .read(); // Read the characteristic's value
-      debugPrint('Background service: Raw BT bytes received: $value (length: ${value.length})');
       if (value.length >= 8) {
         // Expecting at least 8 bytes for two Float32 values
         final byteData = ByteData.view(Uint8List.fromList(value).buffer);
@@ -576,39 +498,30 @@ Future<void> _collectAndLogData(
           4,
           Endian.little,
         ); // Next 4 bytes for humidity
-        debugPrint('Background service: Parsed temp=$temp, hum=$hum');
 
         // Check for invalid values (0xFFFFFFFF = sensor error/not ready)
         final tempBytes = value.sublist(0, 4);
         final isTempInvalid = tempBytes.every((b) => b == 255); // 0xFFFFFFFF
 
         if (isTempInvalid) {
-          debugPrint('Background service: Temperature sensor returning 0xFFFFFFFF (not ready or error)');
           btDataStr = 'Temp: -- °C (capteur non prêt), Hum: ${hum.isNaN ? "--" : hum.toStringAsFixed(2)} %';
         } else if (temp.isNaN || hum.isNaN) {
-          debugPrint('Background service: WARNING - NaN detected! Raw bytes: $tempBytes (temp), ${value.sublist(4, 8)} (hum)');
           btDataStr = 'Erreur: données capteur invalides';
         } else {
           btDataStr =
               'Temp: ${temp.toStringAsFixed(2)} °C, Hum: ${hum.toStringAsFixed(2)} %';
         }
-        debugPrint('Background service: Bluetooth data read: $btDataStr');
       } else {
         btDataStr =
             'Error: Not enough bytes (${value.length}) from BT device. Expected 8+';
-        debugPrint(
-          'Background service: $btDataStr',
-        ); // Log the error internally
       }
     } else {
       btDataStr = 'Device disconnected.';
-      debugPrint('Background service: $btDataStr');
       // IMPORTANT: Do NOT stop the service here. The `_connectionStateSubscription` in `onStart`
       // will handle the disconnection and stop the service gracefully.
     }
   } catch (e) {
     btDataStr = 'Error reading BT data: $e';
-    debugPrint('Background service: $btDataStr'); // Log the error internally
     // IMPORTANT: Do NOT stop the service here. Allow the service to continue attempting readings.
   }
 
@@ -619,14 +532,11 @@ Future<void> _collectAndLogData(
     accuracy = cachedPosition.accuracy;
     locationDataStr =
         'Lat: ${lat.toStringAsFixed(6)}, Lon: ${lon.toStringAsFixed(6)}';
-    debugPrint('Background service: GPS data (cached): $locationDataStr');
   } else {
     locationDataStr = 'GPS: en attente de position...';
-    debugPrint('Background service: No cached GPS position yet.');
   }
 
   // --- Append data to CSV ---
-  debugPrint('Background service: Appending data to CSV...');
   await appendToCsv([
     timestamp,
     temp?.toStringAsFixed(2) ?? 'N/A', // Use 'N/A' if data is null
@@ -635,7 +545,6 @@ Future<void> _collectAndLogData(
     lon?.toString() ?? 'N/A',
     accuracy?.toStringAsFixed(2) ?? 'N/A',
   ], csvFilePath);
-  debugPrint('Background service: Data appended to CSV.');
 
   // --- Send data to UI ---
   // Update the UI with the latest status and collected data.
@@ -657,23 +566,18 @@ Future<void> _collectAndLogData(
           'Service GPS ou autorisation désactivés/refusés.',
         ),
   });
-  debugPrint('Background service: UI updated with latest data.');
 }
 
 // --- Main Application Entry Point ---
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Ensure Flutter widgets are initialized
-  debugPrint('Main: WidgetsFlutterBinding initialized.');
+
+  // Disable FlutterBluePlus logging (must be called early)
+  FlutterBluePlus.setLogLevel(LogLevel.none, color: false);
 
   await initializeService(); // Initialize the background service configuration
-  debugPrint('Main: Background service initialized.');
-
-  // Enable verbose logging for FlutterBluePlus to aid in debugging Bluetooth issues.
-  FlutterBluePlus.setLogLevel(LogLevel.verbose);
-  debugPrint('Main: FlutterBluePlus log level set to verbose.');
 
   runApp(const MyApp());
-  debugPrint('Main: MyApp started.');
 }
 
 // --- Main Flutter App Widget ---
@@ -722,9 +626,6 @@ class _LifecycleWatcherState extends State<LifecycleWatcher>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.detached) {
       // Stop the background service when the app is exited or detached.
-      debugPrint(
-        'LifecycleWatcher: App detached. Stopping background service.',
-      );
       FlutterBackgroundService().invoke('stopService');
     }
   }

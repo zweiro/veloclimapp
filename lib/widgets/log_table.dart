@@ -7,6 +7,31 @@ class LogTable extends StatelessWidget {
 
   const LogTable({super.key, required this.csvLines});
 
+  /// Formats ISO 8601 timestamp to display date and time on separate lines.
+  /// Example: "2026-06-28T16:13:24.500" → "28/06/2026" + "16:13:24.5"
+  Widget _buildDateCell(String isoTimestamp) {
+    try {
+      final dateTime = DateTime.parse(isoTimestamp);
+      final date = '${dateTime.day.toString().padLeft(2, '0')}/'
+          '${dateTime.month.toString().padLeft(2, '0')}/'
+          '${dateTime.year}';
+      final time = '${dateTime.hour.toString().padLeft(2, '0')}:'
+          '${dateTime.minute.toString().padLeft(2, '0')}:'
+          '${dateTime.second.toString().padLeft(2, '0')}.'
+          '${(dateTime.millisecond ~/ 100)}';
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(date),
+          Text(time),
+        ],
+      );
+    } catch (_) {
+      return Text(isoTimestamp);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -65,7 +90,7 @@ class LogTable extends StatelessWidget {
                 }
                 return DataRow(
                   cells: [
-                    DataCell(Text(cells[0])),
+                    DataCell(_buildDateCell(cells[0])),
                     DataCell(
                       Text(
                         cells[1],
