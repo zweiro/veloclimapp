@@ -1,6 +1,11 @@
 # VeloClimApp
-A flutter app used to collect data from sensors mounted on a bike.
-=======
+
+![Flutter](https://img.shields.io/badge/Flutter-02569B?logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-0175C2?logo=dart&logoColor=white)
+![Android](https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white)
+![Bluetooth](https://img.shields.io/badge/Bluetooth-0082FC?logo=bluetooth&logoColor=white)
+
+A Flutter app used to collect data from sensors mounted on a bike.
 
 # Description
 
@@ -27,10 +32,3 @@ flutter clean
 flutter pub get
 flutter build apk --release
 ```
-
-## TODO
-- remove prints
-- fix double tap on stop button
-- eventually permissions for more android versions to work
-- push data on a server
-
