@@ -155,6 +155,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
                       onPressed: _isTesting || _isSaving ? null : _testConnection,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey.shade700,
+                      ),
                       icon: _isTesting
                           ? const SizedBox(
                               width: 16,
