@@ -18,6 +18,10 @@
 
     <!-- Required for Foreground Service (for background logging) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Android 14 (API 34) requires specific permissions for each foreground service type -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- Required for showing notifications on Android 13 (API 33) and above -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
