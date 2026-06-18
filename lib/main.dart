@@ -470,9 +470,8 @@ Future<void> _collectAndLogData(
   String? csvFilePath,
   Position? cachedPosition,
 ) async {
-  final now = DateTime.now();
-  String timestamp = now
-      .toIso8601String(); // ISO 8601 format for consistent timestamps
+  final now = DateTime.now().toUtc();
+  String timestamp = now.toIso8601String(); // ISO 8601 format, ends with "Z"
 
   double? temp, hum, lat, lon, accuracy;
   String btDataStr = 'No data';
