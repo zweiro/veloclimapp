@@ -11,7 +11,7 @@ class LogTable extends StatelessWidget {
   /// Example: "2026-06-28T16:13:24.500" → "28/06/2026" + "16:13:24.5"
   Widget _buildDateCell(String isoTimestamp) {
     try {
-      final dateTime = DateTime.parse(isoTimestamp);
+      final dateTime = DateTime.parse(isoTimestamp).toLocal();
       final date = '${dateTime.day.toString().padLeft(2, '0')}/'
           '${dateTime.month.toString().padLeft(2, '0')}/'
           '${dateTime.year}';
