@@ -168,11 +168,19 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Code de session',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                  Text.rich(
+                    TextSpan(
+                      text: 'Code de ',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      children: const [
+                        TextSpan(
+                          text: 'ThermoParty',
+                          style: TextStyle(fontStyle: FontStyle.italic),
+                        ),
+                      ],
                     ),
                   ),
                   TextField(
