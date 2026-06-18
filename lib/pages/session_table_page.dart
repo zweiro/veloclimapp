@@ -56,7 +56,7 @@ class _SessionTablePageState extends State<SessionTablePage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        Utils.showSnackBar('Erreur lors du chargement des sessions', context);
+        Utils.showSnackBar('Erreur lors du chargement des mesures', context);
       }
     }
   }
@@ -114,7 +114,7 @@ class _SessionTablePageState extends State<SessionTablePage> {
 
     if (sessionCode == null || sessionCode.isEmpty) {
       if (mounted) {
-        Utils.showSnackBar('Veuillez configurer le code de session', context);
+        Utils.showSnackBar('Veuillez configurer le code de mesure', context);
       }
       return;
     }
@@ -131,7 +131,7 @@ class _SessionTablePageState extends State<SessionTablePage> {
       if (success) {
         await DatabaseService.instance.markSessionAsSynced(session.id!);
         if (mounted) {
-          Utils.showSnackBar('Session synchronisée', context);
+          Utils.showSnackBar('Mesure synchronisée', context);
           _loadSessions();
         }
       } else {
@@ -153,7 +153,7 @@ class _SessionTablePageState extends State<SessionTablePage> {
   Future<void> _syncAllNotSynced() async {
     final notSyncedSessions = _sessions.where((s) => !s.synced).toList();
     if (notSyncedSessions.isEmpty) {
-      Utils.showSnackBar('Toutes les sessions sont déjà synchronisées', context);
+      Utils.showSnackBar('Toutes les mesures sont déjà synchronisées', context);
       return;
     }
 
@@ -169,7 +169,7 @@ class _SessionTablePageState extends State<SessionTablePage> {
 
     if (sessionCode == null || sessionCode.isEmpty) {
       if (mounted) {
-        Utils.showSnackBar('Veuillez configurer le code de session', context);
+        Utils.showSnackBar('Veuillez configurer le code de mesure', context);
       }
       return;
     }
@@ -189,7 +189,7 @@ class _SessionTablePageState extends State<SessionTablePage> {
           await DatabaseService.instance.markSessionAsSynced(session.id!);
         }
         if (mounted) {
-          Utils.showSnackBar('${notSyncedSessions.length} session(s) synchronisée(s)', context);
+          Utils.showSnackBar('${notSyncedSessions.length} mesure(s) synchronisée(s)', context);
           _loadSessions();
         }
       } else {
@@ -212,7 +212,7 @@ class _SessionTablePageState extends State<SessionTablePage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Supprimer la session'),
+        title: const Text('Supprimer la mesure'),
         content: Text('Voulez-vous vraiment supprimer "${session.name}" ?'),
         actions: [
           TextButton(
@@ -239,7 +239,7 @@ class _SessionTablePageState extends State<SessionTablePage> {
         await DatabaseService.instance.deleteSession(session.id!);
 
         if (mounted) {
-          Utils.showSnackBar('Session supprimée', context);
+          Utils.showSnackBar('Mesure supprimée', context);
           _loadSessions();
         }
       } catch (e) {
@@ -271,7 +271,7 @@ class _SessionTablePageState extends State<SessionTablePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sessions'),
+        title: const Text('Mesures'),
         elevation: 0,
         actions: [
           PopupMenuButton<String>(
@@ -355,7 +355,7 @@ class _SessionTablePageState extends State<SessionTablePage> {
                 Expanded(
                   flex: 2,
                   child: Text(
-                    'Session (${_sessions.length})',
+                    'Mesure (${_sessions.length})',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey.shade700),
                   ),
                 ),
@@ -377,7 +377,7 @@ class _SessionTablePageState extends State<SessionTablePage> {
                 : _sessions.isEmpty
                     ? const Center(
                         child: Text(
-                          'Aucune session',
+                          'Aucune mesure',
                           style: TextStyle(color: Colors.grey),
                         ),
                       )
