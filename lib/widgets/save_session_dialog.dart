@@ -93,7 +93,7 @@ class _SaveSessionDialogState extends State<SaveSessionDialog> {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Text(
-        'Enregistrement de la mesure',
+        'Enregistrement des données',
         style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
       ),
       content: TextField(

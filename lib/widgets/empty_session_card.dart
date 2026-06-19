@@ -25,7 +25,7 @@ class EmptySessionCard extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             Text(
-              'Connectez-vous au capteur et démarrez une nouvelle mesure pour pouvoir consulter les données',
+              'Connectez-vous au capteur et démarrez une nouvelle session pour pouvoir consulter les données',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.grey.shade600,

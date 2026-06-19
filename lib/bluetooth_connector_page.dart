@@ -331,7 +331,7 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
           csvFilePath: csvFilePath,
           startedAt: startTime,
           onSaved: () {
-            Utils.showSnackBar('Mesure enregistrée.', context);
+            Utils.showSnackBar('Données enregistrées.', context);
           },
         ),
       );
@@ -433,7 +433,7 @@ class _BluetoothConnectorPageState extends State<BluetoothConnectorPage> {
               foregroundColor: Colors.grey.shade700,
             ),
             icon: const Icon(Icons.list),
-            label: const Text('Mesures'),
+            label: const Text('Données'),
           ),
           IconButton(
             onPressed: () {
