@@ -3,6 +3,21 @@ import 'package:sensor_logging/services/preferences_service.dart';
 import 'package:sensor_logging/services/api_service.dart';
 import 'package:sensor_logging/utils.dart';
 
+const _monthNames = [
+  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+];
+
+String _formatDate(String? isoDate) {
+  if (isoDate == null || isoDate.isEmpty) return '?';
+  try {
+    final date = DateTime.parse(isoDate).toLocal();
+    return '${date.day} ${_monthNames[date.month - 1]} ${date.year}';
+  } catch (e) {
+    return isoDate;
+  }
+}
+
 /// Page for configuring server settings (URL and session code).
 class ServerSettingsPage extends StatefulWidget {
   const ServerSettingsPage({super.key});
@@ -18,18 +33,35 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isTesting = false;
+  bool _codeValidated = false;
+  String? _validationMessage;
+  bool _validationSuccess = false;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _serverUrlController.addListener(_onFieldChanged);
+    _sessionCodeController.addListener(_onFieldChanged);
   }
 
   @override
   void dispose() {
+    _serverUrlController.removeListener(_onFieldChanged);
+    _sessionCodeController.removeListener(_onFieldChanged);
     _serverUrlController.dispose();
     _sessionCodeController.dispose();
     super.dispose();
+  }
+
+  void _onFieldChanged() {
+    if (_codeValidated) {
+      setState(() {
+        _codeValidated = false;
+        _validationMessage = null;
+        _validationSuccess = false;
+      });
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -38,11 +70,19 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       final sessionCode = await PreferencesService.instance.getSessionCode();
 
       if (mounted) {
+        // Temporarily remove listeners to avoid triggering _onFieldChanged
+        _serverUrlController.removeListener(_onFieldChanged);
+        _sessionCodeController.removeListener(_onFieldChanged);
+
         setState(() {
           _serverUrlController.text = serverUrl ?? '';
           _sessionCodeController.text = sessionCode ?? '';
           _isLoading = false;
         });
+
+        // Re-add listeners
+        _serverUrlController.addListener(_onFieldChanged);
+        _sessionCodeController.addListener(_onFieldChanged);
       }
     } catch (e) {
       if (mounted) {
@@ -54,27 +94,69 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   Future<void> _testConnection() async {
     if (_isTesting) return;
 
-    final validationError = ApiService.validateUrl(_serverUrlController.text);
-    if (validationError != null) {
-      Utils.showSnackBar(validationError, context);
+    final serverUrl = _serverUrlController.text.trim();
+    final sessionCode = _sessionCodeController.text.trim();
+
+    // Validate URL
+    final urlError = ApiService.validateUrl(serverUrl);
+    if (urlError != null) {
+      setState(() {
+        _validationMessage = urlError;
+        _validationSuccess = false;
+        _codeValidated = false;
+      });
       return;
     }
 
-    setState(() => _isTesting = true);
+    // Validate code is not empty
+    if (sessionCode.isEmpty) {
+      setState(() {
+        _validationMessage = 'Veuillez entrer le code ThermoParty';
+        _validationSuccess = false;
+        _codeValidated = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isTesting = true;
+      _validationMessage = null;
+    });
 
     try {
-      final success = await ApiService.pingServer(_serverUrlController.text.trim());
+      final result = await ApiService.checkThermoCode(
+        serverUrl: serverUrl,
+        code: sessionCode,
+      );
 
       if (mounted) {
-        if (success) {
-          Utils.showSnackBar('Connexion réussie !', context);
+        if (result.valid) {
+          setState(() {
+            _codeValidated = true;
+            _validationSuccess = true;
+            _validationMessage = 'Connexion réussie !\nPériode : ${_formatDate(result.startDate)} - ${_formatDate(result.endDate)}';
+          });
         } else {
-          Utils.showSnackBar('Échec de la connexion au serveur', context);
+          setState(() {
+            _codeValidated = false;
+            _validationSuccess = false;
+            if (result.reason == 'code_invalide') {
+              _validationMessage = 'Code ThermoParty invalide';
+            } else if (result.reason == 'hors_periode') {
+              _validationMessage = result.message ?? 'Code hors période';
+            } else {
+              _validationMessage = result.message ?? 'Erreur de validation';
+            }
+          });
         }
       }
     } catch (e) {
       if (mounted) {
-        Utils.showSnackBar('Erreur: $e', context);
+        setState(() {
+          _codeValidated = false;
+          _validationSuccess = false;
+          _validationMessage = 'Impossible de contacter le serveur';
+        });
       }
     } finally {
       if (mounted) {
@@ -84,21 +166,14 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   }
 
   Future<void> _saveSettings() async {
-    if (_isSaving) return;
-
-    final serverUrl = _serverUrlController.text.trim();
-    if (serverUrl.isNotEmpty) {
-      final validationError = ApiService.validateUrl(serverUrl);
-      if (validationError != null) {
-        Utils.showSnackBar(validationError, context);
-        return;
-      }
-    }
+    if (_isSaving || !_codeValidated) return;
 
     setState(() => _isSaving = true);
 
     try {
-      await PreferencesService.instance.setServerUrl(serverUrl);
+      await PreferencesService.instance.setServerUrl(
+        _serverUrlController.text.trim(),
+      );
       await PreferencesService.instance.setSessionCode(
         _sessionCodeController.text.trim(),
       );
@@ -149,25 +224,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                     autocorrect: false,
                     enabled: !_isSaving && !_isTesting,
                   ),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: _isTesting || _isSaving ? null : _testConnection,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.grey.shade700,
-                      ),
-                      icon: _isTesting
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.wifi_find, size: 18),
-                      label: Text(_isTesting ? 'Test en cours...' : 'Tester la connexion'),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                   Text.rich(
                     TextSpan(
                       text: 'Code de ',
@@ -190,16 +247,81 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                       border: UnderlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(vertical: 8),
                     ),
-                    enabled: !_isSaving,
+                    enabled: !_isSaving && !_isTesting,
                   ),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _isTesting || _isSaving ? null : _testConnection,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey.shade700,
+                      ),
+                      icon: _isTesting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.wifi_find, size: 18),
+                      label: Text(_isTesting ? 'Test en cours...' : 'Tester la connexion'),
+                    ),
+                  ),
+                  if (_validationMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: _validationSuccess
+                            ? Colors.green.shade50
+                            : Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _validationSuccess
+                              ? Colors.green.shade200
+                              : Colors.red.shade200,
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            _validationSuccess
+                                ? Icons.check_circle
+                                : Icons.error,
+                            color: _validationSuccess
+                                ? Colors.green.shade700
+                                : Colors.red.shade700,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _validationMessage!,
+                              style: TextStyle(
+                                color: _validationSuccess
+                                    ? Colors.green.shade700
+                                    : Colors.red.shade700,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _isSaving || _isTesting ? null : _saveSettings,
+                      onPressed: _isSaving || _isTesting || !_codeValidated
+                          ? null
+                          : _saveSettings,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        disabledForegroundColor: Colors.grey.shade500,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(24),
                         ),
@@ -225,6 +347,18 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                             ),
                     ),
                   ),
+                  if (!_codeValidated) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Testez la connexion pour pouvoir sauvegarder',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ],
               ),
             ),

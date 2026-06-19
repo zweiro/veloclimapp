@@ -1,8 +1,43 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+
+class ThermoCodeResult {
+  final bool valid;
+  final String? reason;
+  final String? message;
+  final String? startDate;
+  final String? endDate;
+
+  ThermoCodeResult({
+    required this.valid,
+    this.reason,
+    this.message,
+    this.startDate,
+    this.endDate,
+  });
+
+  factory ThermoCodeResult.fromResponse(int statusCode, Map<String, dynamic> json) {
+    return ThermoCodeResult(
+      valid: json['valid'] == true,
+      reason: json['reason'] as String?,
+      message: json['message'] as String?,
+      startDate: json['start_date'] as String?,
+      endDate: json['end_date'] as String?,
+    );
+  }
+
+  factory ThermoCodeResult.error(String message) {
+    return ThermoCodeResult(
+      valid: false,
+      reason: 'error',
+      message: message,
+    );
+  }
+}
 
 /// Service for communicating with the VeloClimap server.
 class ApiService {
@@ -19,6 +54,28 @@ class ApiService {
       return response.statusCode == 200;
     } catch (e) {
       return false;
+    }
+  }
+
+  /// Check if a ThermoParty code is valid.
+  /// Returns a ThermoCodeResult with validation status and period dates.
+  static Future<ThermoCodeResult> checkThermoCode({
+    required String serverUrl,
+    required String code,
+  }) async {
+    try {
+      final baseUrl = _normalizeUrl(serverUrl);
+      final uri = Uri.parse('$baseUrl/checkThermoCode').replace(
+        queryParameters: {'code': code},
+      );
+      final response = await http
+          .get(uri, headers: {'Content-Type': 'application/json'})
+          .timeout(const Duration(seconds: 10));
+
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      return ThermoCodeResult.fromResponse(response.statusCode, json);
+    } catch (e) {
+      return ThermoCodeResult.error('Impossible de contacter le serveur');
     }
   }
 
