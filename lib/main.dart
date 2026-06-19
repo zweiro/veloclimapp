@@ -102,7 +102,7 @@ void onStart(ServiceInstance service) async {
   String? deviceName;
   BluetoothDevice? connectedDevice;
   BluetoothCharacteristic? targetCharacteristic;
-  Timer? logTimer; // Timer for periodic data collection
+  Timer? fallbackTimer; // Fallback timer when GPS doesn't update
   StreamSubscription<BluetoothConnectionState>?
   connectionStateSubscription; // Listens for BT device disconnection
   StreamSubscription<BluetoothAdapterState>?
@@ -113,6 +113,7 @@ void onStart(ServiceInstance service) async {
   bool isReconnecting = false;
   int reconnectionAttempts = 0;
   bool isCollecting = false; // Prevent concurrent CSV writes
+  bool isLoggingActive = false; // Track if logging has started
 
   // GPS stream variables for continuous position updates
   Position? lastKnownPosition;
@@ -133,9 +134,9 @@ void onStart(ServiceInstance service) async {
   // This listener handles requests from the UI to stop the background service.
   service.on('stopService').listen((event) async {
     // Clean up all resources to prevent leaks and ensure a graceful shutdown.
-    logTimer
-        ?.cancel(); // Stop the periodic logging timer - Removed 'await' as cancel() returns void
-    logTimer = null; // Clear the timer reference
+    isLoggingActive = false;
+    fallbackTimer?.cancel();
+    fallbackTimer = null;
     await connectionStateSubscription
         ?.cancel(); // Cancel device connection state listener
     await adapterStateSubscription
@@ -186,7 +187,7 @@ void onStart(ServiceInstance service) async {
       service.invoke('stopService'); // Request to stop the service
     } else {
       // Bluetooth is ON, update status if logging is active.
-      if (logTimer?.isActive ?? false) {
+      if (isLoggingActive) {
         service.invoke('updateUI', {
           'status': 'Bluetooth activé. Journalisation en cours...',
         });
@@ -205,21 +206,8 @@ void onStart(ServiceInstance service) async {
     // Ensure CSV header for this session's file
     await ensureCsvHeader(csvFilePath);
 
-    // Initialize GPS stream for continuous position updates
-    await gpsSubscription?.cancel();
-    gpsSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high, // "best" is not available on Android: https://pub.dev/packages/geolocator#location-accuracy
-        distanceFilter: 0, // Capture all updates regardless of distance
-      ),
-    ).listen((Position position) {
-      lastKnownPosition = position;
-    }, onError: (error) {
-      // GPS stream error
-    });
-
     // Prevent starting logging if it's already active.
-    if (logTimer?.isActive ?? false) {
+    if (isLoggingActive) {
       service.invoke('updateUI', {
         'status': 'Journalisation déjà en cours pour "$deviceName".',
       });
@@ -414,39 +402,121 @@ void onStart(ServiceInstance service) async {
         return;
       }
 
-      // --- Start Periodic Data Collection & Logging ---
-      // This timer will trigger the data collection function at a fixed interval.
-      logTimer = Timer.periodic(const Duration(seconds: 1), (
-        timer,
-      ) async {
-        // Skip if reconnecting or already collecting (prevents concurrent writes)
-        if (isReconnecting || isCollecting) {
-          return;
-        }
-        if (connectedDevice != null && targetCharacteristic != null) {
-          isCollecting = true;
-          try {
-            await _collectAndLogData(
-              service,
-              connectedDevice!,
-              targetCharacteristic!,
-              csvFilePath,
-              lastKnownPosition,
-            );
-          } finally {
-            isCollecting = false;
+      // --- Start GPS-driven Data Collection ---
+      isLoggingActive = true;
+
+      // Function to check GPS availability and log if unavailable
+      // Defined as a variable so it can be called recursively and from the GPS listener
+      late void Function() startGpsCheckTimer;
+      startGpsCheckTimer = () {
+        fallbackTimer?.cancel();
+        fallbackTimer = Timer(const Duration(seconds: 10), () async {
+          if (!isLoggingActive || isReconnecting || isCollecting) {
+            startGpsCheckTimer(); // Restart timer
+            return;
           }
-        } else {
-          service.invoke('updateUI', {
-            'status':
-                'Error: Bluetooth device/characteristic unavailable. Stopping.',
-          });
-          service.invoke('stopService');
+
+          // Try to get current position to check if GPS is available
+          try {
+            final position = await Geolocator.getCurrentPosition(
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high,
+              ),
+            ).timeout(const Duration(seconds: 5));
+
+            // GPS is available - user is just stationary due to distanceFilter
+            // Don't log, just restart the timer
+            lastKnownPosition = position;
+            startGpsCheckTimer();
+          } catch (e) {
+            // GPS is unavailable - log with N/A and restart timer
+            if (connectedDevice != null && targetCharacteristic != null) {
+              isCollecting = true;
+              try {
+                await _collectAndLogData(
+                  service,
+                  connectedDevice!,
+                  targetCharacteristic!,
+                  csvFilePath,
+                  null,
+                );
+              } finally {
+                isCollecting = false;
+              }
+            }
+            startGpsCheckTimer(); // Continue checking while GPS unavailable
+          }
+        });
+      };
+
+      // Initialize GPS stream - each new position triggers data collection
+      await gpsSubscription?.cancel();
+      gpsSubscription = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 2, // New measurement every 2 meters
+        ),
+      ).listen((Position position) async {
+        // Skip if not logging, reconnecting, or already collecting
+        if (!isLoggingActive || isReconnecting || isCollecting) return;
+
+        lastKnownPosition = position;
+
+        // Cancel fallback timer - GPS is working
+        fallbackTimer?.cancel();
+        fallbackTimer = null;
+
+        // Log immediately with fresh GPS position
+        isCollecting = true;
+        try {
+          await _collectAndLogData(
+            service,
+            connectedDevice!,
+            targetCharacteristic!,
+            csvFilePath,
+            position,
+          );
+        } finally {
+          isCollecting = false;
         }
+
+        // Restart the GPS check timer after logging
+        startGpsCheckTimer();
+      }, onError: (error) {
+        // GPS stream error - start check timer to detect unavailability
+        startGpsCheckTimer();
       });
 
+      // Get initial GPS position and log first measurement
+      try {
+        final initialPosition = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        ).timeout(const Duration(seconds: 5));
+
+        lastKnownPosition = initialPosition;
+        isCollecting = true;
+        try {
+          await _collectAndLogData(
+            service,
+            connectedDevice!,
+            targetCharacteristic!,
+            csvFilePath,
+            initialPosition,
+          );
+        } finally {
+          isCollecting = false;
+        }
+      } catch (e) {
+        // GPS timeout - first measurement will come from stream or fallback
+      }
+
+      // Start the GPS check timer
+      startGpsCheckTimer();
+
       service.invoke('updateUI', {
-        'status': 'Connecté. Journalisation toutes les secondes.',
+        'status': 'Connecté. Journalisation basée sur GPS (2m).',
       });
     } catch (e) {
       // Catch any errors during Bluetooth scanning, connection, or service discovery.
