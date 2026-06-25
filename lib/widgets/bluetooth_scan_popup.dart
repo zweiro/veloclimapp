@@ -345,35 +345,32 @@ class _BluetoothScanDialogState extends State<_BluetoothScanDialog> {
                   style: TextStyle(color: Colors.black54),
                 ),
               )
-            : SingleChildScrollView(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: _devices.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final device = _devices[index];
-                    final isConnected =
-                        widget.connectedDevice != null &&
-                        (device.id == widget.connectedDevice!.id) &&
-                        widget.isRunning;
-                    return ListTile(
-                      leading: const Icon(Icons.bluetooth),
-                      title: Text(
-                        device.name.isNotEmpty
-                            ? device.name
-                            : device.id.toString(),
-                      ),
-                      subtitle: Text(device.id.toString()),
-                      trailing: isConnected
-                          ? const Icon(Icons.check_circle, color: Colors.green)
-                          : null,
-                      onTap: () {
-                        widget.onDeviceSelected(device);
-                        Navigator.of(context).pop();
-                      },
-                    );
-                  },
-                ),
+            : ListView.separated(
+                itemCount: _devices.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final device = _devices[index];
+                  final isConnected =
+                      widget.connectedDevice != null &&
+                      (device.id == widget.connectedDevice!.id) &&
+                      widget.isRunning;
+                  return ListTile(
+                    leading: const Icon(Icons.bluetooth),
+                    title: Text(
+                      device.name.isNotEmpty
+                          ? device.name
+                          : device.id.toString(),
+                    ),
+                    subtitle: Text(device.id.toString()),
+                    trailing: isConnected
+                        ? const Icon(Icons.check_circle, color: Colors.green)
+                        : null,
+                    onTap: () {
+                      widget.onDeviceSelected(device);
+                      Navigator.of(context).pop();
+                    },
+                  );
+                },
               ),
       ),
       actions: [
